@@ -1,0 +1,18 @@
+# Dépendances
+node_modules/
+
+# Next.js
+.next/
+out/
+
+# Variables d'environnement (NE JAMAIS COMMITTER)
+.env
+.env.local
+.env.*.local
+
+# Workflows n8n (contiennent des clés API)
+n8n-workflows/
+
+# Divers
+.DS_Store
+*.log
