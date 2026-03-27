@@ -1,7 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
+import { DEFAULT_AGENT_PROMPT } from "@/lib/agentDefaults";
 import AgentClient from "./AgentClient";
-
-const DEFAULT_PROMPT = "";
 
 export default async function AgentPage() {
   const supabase = await createClient();
@@ -11,7 +10,7 @@ export default async function AgentPage() {
     .eq("id", 1)
     .single();
 
-  const prompt = data?.prompt ?? DEFAULT_PROMPT;
+  const prompt = data?.prompt || DEFAULT_AGENT_PROMPT;
 
   return <AgentClient initialPrompt={prompt} />;
 }
