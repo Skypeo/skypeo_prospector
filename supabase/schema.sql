@@ -78,3 +78,22 @@ create index if not exists prospects_campagne_id_idx on public.prospects(campagn
 
 alter table public.prospects
   add column if not exists campagne_id uuid references public.campagnes(id) on delete set null;
+
+-- =============================================
+-- Table settings (prompt agent IA)
+-- =============================================
+
+create table if not exists public.settings (
+  id integer primary key default 1,
+  prompt text not null default '',
+  updated_at timestamptz default now() not null,
+  constraint single_row check (id = 1)
+);
+
+alter table public.settings enable row level security;
+
+create policy "Authenticated users can manage settings"
+  on public.settings for all
+  to authenticated
+  using (true)
+  with check (true);
