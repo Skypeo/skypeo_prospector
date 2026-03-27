@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useState } from "react";
+import { useCallback, useState, useRef, useEffect } from "react";
 import CsvUploader from "@/components/CsvUploader";
 import Toast from "@/components/Toast";
 import { createClient } from "@/lib/supabase/client";
@@ -112,6 +112,168 @@ export function CsvUploaderWrapper() {
           router.refresh();
         }}
       />
+      {toast && <Toast message={toast.message} type={toast.type} onDone={() => setToast(null)} />}
+    </>
+  );
+}
+
+export function AddProspectButton() {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+  const [form, setForm] = useState({ nom: "", telephone: "", societe: "", activite: "", ville: "" });
+  const firstInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (open) setTimeout(() => firstInputRef.current?.focus(), 50);
+  }, [open]);
+
+  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+    setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!form.nom.trim() || !form.telephone.trim()) return;
+    setLoading(true);
+    const supabase = createClient();
+    const { error } = await supabase.from("prospects").insert({
+      nom: form.nom.trim(),
+      telephone: form.telephone.trim(),
+      societe: form.societe.trim() || null,
+      activite: form.activite.trim() || null,
+      ville: form.ville.trim() || null,
+    });
+    setLoading(false);
+    if (error) {
+      setToast({ message: "Erreur lors de la création.", type: "error" });
+    } else {
+      setOpen(false);
+      setForm({ nom: "", telephone: "", societe: "", activite: "", ville: "" });
+      setToast({ message: "Prospect ajouté.", type: "success" });
+      router.refresh();
+    }
+  }
+
+  return (
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all"
+        style={{ background: "linear-gradient(135deg, #008f78, #2b3475)" }}
+      >
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+        </svg>
+        Prospect
+      </button>
+
+      {open && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}
+          onClick={(e) => { if (e.target === e.currentTarget) setOpen(false); }}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl p-6"
+            style={{ background: "#13102a", border: "1px solid rgba(255,255,255,0.1)" }}
+          >
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-lg font-bold text-white">Nouveau prospect</h2>
+              <button onClick={() => setOpen(false)} className="text-white/30 hover:text-white transition-colors">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-white/40 mb-1 block">Nom *</label>
+                  <input
+                    ref={firstInputRef}
+                    name="nom"
+                    value={form.nom}
+                    onChange={handleChange}
+                    required
+                    placeholder="Jean Dupont"
+                    className="w-full px-3 py-2 rounded-xl text-sm text-white placeholder-white/25 outline-none focus:ring-1 focus:ring-brand-500/50"
+                    style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)" }}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-white/40 mb-1 block">Téléphone *</label>
+                  <input
+                    name="telephone"
+                    value={form.telephone}
+                    onChange={handleChange}
+                    required
+                    placeholder="+33612345678"
+                    className="w-full px-3 py-2 rounded-xl text-sm text-white placeholder-white/25 outline-none focus:ring-1 focus:ring-brand-500/50"
+                    style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)" }}
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs text-white/40 mb-1 block">Société</label>
+                <input
+                  name="societe"
+                  value={form.societe}
+                  onChange={handleChange}
+                  placeholder="Entreprise SAS"
+                  className="w-full px-3 py-2 rounded-xl text-sm text-white placeholder-white/25 outline-none focus:ring-1 focus:ring-brand-500/50"
+                  style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)" }}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-white/40 mb-1 block">Activité</label>
+                  <input
+                    name="activite"
+                    value={form.activite}
+                    onChange={handleChange}
+                    placeholder="Plombier"
+                    className="w-full px-3 py-2 rounded-xl text-sm text-white placeholder-white/25 outline-none focus:ring-1 focus:ring-brand-500/50"
+                    style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)" }}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-white/40 mb-1 block">Ville</label>
+                  <input
+                    name="ville"
+                    value={form.ville}
+                    onChange={handleChange}
+                    placeholder="Nancy"
+                    className="w-full px-3 py-2 rounded-xl text-sm text-white placeholder-white/25 outline-none focus:ring-1 focus:ring-brand-500/50"
+                    style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)" }}
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setOpen(false)}
+                  className="px-4 py-2 rounded-xl text-sm text-white/40 hover:text-white transition-colors"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading || !form.nom.trim() || !form.telephone.trim()}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white disabled:opacity-50 transition-all"
+                  style={{ background: "linear-gradient(135deg, #008f78, #2b3475)" }}
+                >
+                  {loading ? "Création..." : "Créer le prospect"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {toast && <Toast message={toast.message} type={toast.type} onDone={() => setToast(null)} />}
     </>
   );

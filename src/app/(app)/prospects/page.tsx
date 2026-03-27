@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import StatutBadge from "@/components/StatutBadge";
-import { SearchInput, DeleteProspectButton, CsvUploaderWrapper, PaginationControls } from "./ProspectsClient";
+import { SearchInput, DeleteProspectButton, CsvUploaderWrapper, PaginationControls, AddProspectButton } from "./ProspectsClient";
 import { Suspense } from "react";
 import type { ProspectStatut } from "@/types/database";
 
@@ -64,6 +64,9 @@ export default async function ProspectsPage({
         <div className="flex items-center gap-3">
           <Suspense>
             <SearchInput />
+          </Suspense>
+          <Suspense>
+            <AddProspectButton />
           </Suspense>
           <Suspense>
             <CsvUploaderWrapper />
