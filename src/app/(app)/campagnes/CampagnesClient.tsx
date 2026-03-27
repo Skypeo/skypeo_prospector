@@ -69,33 +69,43 @@ function SelectProspectsModal({ campagneId, onClose }: { campagneId: string; onC
   const [quickN, setQuickN] = useState("");
   const [quickSaving, setQuickSaving] = useState(false);
 
+  async function fetchProspects(q?: string) {
+    setLoading(true);
+    const supabase = createClient();
+    let query = supabase
+      .from("prospects")
+      .select("id, nom, societe, ville")
+      .is("campagne_id", null)
+      .eq("statut", "en_attente")
+      .order("created_at", { ascending: true })
+      .limit(200);
+    if (q) query = query.or(`nom.ilike.%${q}%,societe.ilike.%${q}%,ville.ilike.%${q}%`);
+    const { data } = await query;
+    setProspects(data ?? []);
+    setLoading(false);
+  }
+
   useEffect(() => {
     (async () => {
       const supabase = createClient();
-      const [{ data }, { count }] = await Promise.all([
-        supabase
-          .from("prospects")
-          .select("id, nom, societe, ville")
-          .is("campagne_id", null)
-          .eq("statut", "en_attente")
-          .order("created_at", { ascending: true })
-          .limit(200),
-        supabase
-          .from("prospects")
-          .select("*", { count: "exact", head: true })
-          .is("campagne_id", null)
-          .eq("statut", "en_attente"),
-      ]);
-      setProspects(data ?? []);
+      const { count } = await supabase
+        .from("prospects")
+        .select("*", { count: "exact", head: true })
+        .is("campagne_id", null)
+        .eq("statut", "en_attente");
       setTotalDispo(count ?? 0);
-      setLoading(false);
+      await fetchProspects();
     })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const filtered = prospects.filter((p) => {
-    const s = search.toLowerCase();
-    return !s || p.nom?.toLowerCase().includes(s) || p.societe?.toLowerCase().includes(s) || p.ville?.toLowerCase().includes(s);
-  });
+  useEffect(() => {
+    const t = setTimeout(() => fetchProspects(search || undefined), 300);
+    return () => clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search]);
+
+  const filtered = prospects;
 
   function toggle(id: string) {
     setSelected((prev) => {
@@ -177,7 +187,7 @@ function SelectProspectsModal({ campagneId, onClose }: { campagneId: string; onC
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder={`Rechercher parmi les 200 premiers affichés…`}
+            placeholder="Rechercher nom, société, ville..."
             className="w-full px-3.5 py-2 rounded-xl text-sm text-white placeholder-white/25 focus:outline-none focus:ring-1 focus:ring-brand-600/50"
             style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}
           />
