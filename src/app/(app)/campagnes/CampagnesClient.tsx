@@ -61,22 +61,33 @@ function CreateModal({ onClose }: { onClose: () => void }) {
 function SelectProspectsModal({ campagneId, onClose }: { campagneId: string; onClose: () => void }) {
   const router = useRouter();
   const [prospects, setProspects] = useState<{ id: string; nom: string; societe: string | null; ville: string | null }[]>([]);
+  const [totalDispo, setTotalDispo] = useState(0);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
+  const [quickN, setQuickN] = useState("");
+  const [quickSaving, setQuickSaving] = useState(false);
 
   useEffect(() => {
     (async () => {
       const supabase = createClient();
-      const { data } = await supabase
-        .from("prospects")
-        .select("id, nom, societe, ville")
-        .is("campagne_id", null)
-        .eq("statut", "en_attente")
-        .order("created_at", { ascending: false })
-        .limit(500);
+      const [{ data }, { count }] = await Promise.all([
+        supabase
+          .from("prospects")
+          .select("id, nom, societe, ville")
+          .is("campagne_id", null)
+          .eq("statut", "en_attente")
+          .order("created_at", { ascending: true })
+          .limit(200),
+        supabase
+          .from("prospects")
+          .select("*", { count: "exact", head: true })
+          .is("campagne_id", null)
+          .eq("statut", "en_attente"),
+      ]);
       setProspects(data ?? []);
+      setTotalDispo(count ?? 0);
       setLoading(false);
     })();
   }, []);
@@ -86,14 +97,6 @@ function SelectProspectsModal({ campagneId, onClose }: { campagneId: string; onC
     return !s || p.nom?.toLowerCase().includes(s) || p.societe?.toLowerCase().includes(s) || p.ville?.toLowerCase().includes(s);
   });
 
-  function toggleAll() {
-    if (selected.size === filtered.length) {
-      setSelected(new Set());
-    } else {
-      setSelected(new Set(filtered.map((p) => p.id)));
-    }
-  }
-
   function toggle(id: string) {
     setSelected((prev) => {
       const next = new Set(prev);
@@ -102,22 +105,41 @@ function SelectProspectsModal({ campagneId, onClose }: { campagneId: string; onC
     });
   }
 
-  async function assigner() {
+  async function assignerSelection() {
     if (selected.size === 0) return;
     setSaving(true);
     const supabase = createClient();
-    await supabase
-      .from("prospects")
-      .update({ campagne_id: campagneId })
-      .in("id", [...selected]);
+    await supabase.from("prospects").update({ campagne_id: campagneId }).in("id", [...selected]);
     setSaving(false);
+    router.refresh();
+    onClose();
+  }
+
+  async function assignerRapide() {
+    const n = parseInt(quickN);
+    if (!n || n <= 0) return;
+    setQuickSaving(true);
+    const supabase = createClient();
+    const { data } = await supabase
+      .from("prospects")
+      .select("id")
+      .is("campagne_id", null)
+      .eq("statut", "en_attente")
+      .order("created_at", { ascending: true })
+      .limit(n);
+    if (data && data.length > 0) {
+      await supabase.from("prospects").update({ campagne_id: campagneId }).in("id", data.map((p) => p.id));
+    }
+    setQuickSaving(false);
     router.refresh();
     onClose();
   }
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 backdrop-blur-sm">
-      <div className="rounded-2xl w-full max-w-lg mx-4 flex flex-col" style={{ background: "#120d24", border: "1px solid rgba(0,143,120,0.2)", maxHeight: "80vh" }}>
+      <div className="rounded-2xl w-full max-w-lg mx-4 flex flex-col" style={{ background: "#120d24", border: "1px solid rgba(0,143,120,0.2)", maxHeight: "85vh" }}>
+
+        {/* Header */}
         <div className="px-5 py-4 border-b shrink-0" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-base font-bold text-white">Ajouter des prospects</h2>
@@ -127,69 +149,81 @@ function SelectProspectsModal({ campagneId, onClose }: { campagneId: string; onC
               </svg>
             </button>
           </div>
+
+          {/* Sélection rapide */}
+          <div className="flex items-center gap-2 mb-3 p-3 rounded-xl" style={{ background: "rgba(0,143,120,0.08)", border: "1px solid rgba(0,143,120,0.2)" }}>
+            <span className="text-xs text-white/50 shrink-0">Sélection rapide</span>
+            <input
+              type="number"
+              value={quickN}
+              onChange={(e) => setQuickN(e.target.value)}
+              placeholder={`1 – ${totalDispo}`}
+              min={1}
+              max={totalDispo}
+              className="flex-1 px-3 py-1.5 rounded-lg text-sm text-white placeholder-white/25 focus:outline-none focus:ring-1 focus:ring-brand-500/50"
+              style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)" }}
+            />
+            <button
+              onClick={assignerRapide}
+              disabled={quickSaving || !quickN || parseInt(quickN) <= 0}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white disabled:opacity-40 shrink-0 transition-all"
+              style={{ background: "linear-gradient(135deg, #008f78, #2b3475)" }}
+            >
+              {quickSaving ? "..." : "Assigner"}
+            </button>
+          </div>
+
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Rechercher nom, société, ville..."
+            placeholder={`Rechercher parmi les 200 premiers affichés…`}
             className="w-full px-3.5 py-2 rounded-xl text-sm text-white placeholder-white/25 focus:outline-none focus:ring-1 focus:ring-brand-600/50"
             style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}
           />
         </div>
 
+        {/* Liste */}
         <div className="overflow-y-auto flex-1 min-h-0">
           {loading ? (
             <div className="p-8 text-center text-sm text-white/30">Chargement...</div>
           ) : filtered.length === 0 ? (
             <div className="p-8 text-center text-sm text-white/30">Aucun prospect disponible</div>
           ) : (
-            <>
+            filtered.map((p) => (
               <div
+                key={p.id}
                 className="flex items-center gap-3 px-5 py-2.5 cursor-pointer hover:bg-white/3 transition-colors border-b"
-                style={{ borderColor: "rgba(255,255,255,0.05)" }}
-                onClick={toggleAll}
+                style={{ borderColor: "rgba(255,255,255,0.04)" }}
+                onClick={() => toggle(p.id)}
               >
-                <div className={`w-4 h-4 rounded flex items-center justify-center shrink-0 transition-colors ${selected.size === filtered.length && filtered.length > 0 ? "bg-brand-500" : "border border-white/20"}`}>
-                  {selected.size === filtered.length && filtered.length > 0 && (
+                <div className={`w-4 h-4 rounded flex items-center justify-center shrink-0 transition-colors ${selected.has(p.id) ? "bg-brand-500" : "border border-white/20"}`}>
+                  {selected.has(p.id) && (
                     <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                     </svg>
                   )}
                 </div>
-                <span className="text-xs text-white/40">Tout sélectionner ({filtered.length})</span>
-              </div>
-              {filtered.map((p) => (
-                <div
-                  key={p.id}
-                  className="flex items-center gap-3 px-5 py-2.5 cursor-pointer hover:bg-white/3 transition-colors border-b"
-                  style={{ borderColor: "rgba(255,255,255,0.04)" }}
-                  onClick={() => toggle(p.id)}
-                >
-                  <div className={`w-4 h-4 rounded flex items-center justify-center shrink-0 transition-colors ${selected.has(p.id) ? "bg-brand-500" : "border border-white/20"}`}>
-                    {selected.has(p.id) && (
-                      <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                      </svg>
-                    )}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm text-white truncate">{p.nom || "—"}</p>
-                    <p className="text-xs text-white/35 truncate">{[p.societe, p.ville].filter(Boolean).join(" · ")}</p>
-                  </div>
+                <div className="min-w-0">
+                  <p className="text-sm text-white truncate">{p.nom || "—"}</p>
+                  <p className="text-xs text-white/35 truncate">{[p.societe, p.ville].filter(Boolean).join(" · ")}</p>
                 </div>
-              ))}
-            </>
+              </div>
+            ))
           )}
         </div>
 
+        {/* Footer */}
         <div className="px-5 py-4 border-t shrink-0 flex items-center justify-between gap-3" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
-          <span className="text-xs text-white/30">{selected.size} sélectionné(s)</span>
+          <span className="text-xs text-white/30">
+            {selected.size > 0 ? `${selected.size} sélectionné(s)` : `${totalDispo} prospects disponibles`}
+          </span>
           <div className="flex gap-2">
             <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm text-white/50 hover:text-white transition-colors" style={{ background: "rgba(255,255,255,0.06)" }}>
               Annuler
             </button>
             <button
-              onClick={assigner}
+              onClick={assignerSelection}
               disabled={selected.size === 0 || saving}
               className="px-4 py-2 rounded-xl text-sm font-semibold text-white disabled:opacity-40 transition-all"
               style={{ background: "linear-gradient(135deg, #008f78, #2b3475)" }}
