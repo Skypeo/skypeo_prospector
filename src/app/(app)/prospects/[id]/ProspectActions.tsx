@@ -21,6 +21,16 @@ const TEMPERATURES: { value: ProspectTemperature; label: string; color: string }
   { value: "brulant", label: "Brûlant", color: "#ef4444" },
 ];
 
+function statutToTemperature(statut: ProspectStatut): ProspectTemperature {
+  switch (statut) {
+    case "en_attente": return "froid";
+    case "envoye":     return "tiede";
+    case "repondu":    return "chaud";
+    case "rdv":        return "brulant";
+    case "refus":      return "froid";
+  }
+}
+
 export default function ProspectActions({
   prospectId,
   currentStatut,
@@ -56,12 +66,14 @@ export default function ProspectActions({
   async function handleConfirm() {
     if (!pendingStatut) return;
     setSaving(true);
+    const newTemp = statutToTemperature(pendingStatut);
     const supabase = createClient();
-    const { error } = await supabase.from("prospects").update({ statut: pendingStatut }).eq("id", prospectId);
+    const { error } = await supabase.from("prospects").update({ statut: pendingStatut, temperature: newTemp }).eq("id", prospectId);
     if (error) {
       setToast({ message: "Erreur lors de la mise à jour.", type: "error" });
     } else {
       setStatut(pendingStatut);
+      setTemperatureState(newTemp);
       setToast({ message: "Statut mis à jour.", type: "success" });
       router.refresh();
     }
@@ -90,13 +102,19 @@ export default function ProspectActions({
     const updates: Record<string, string | null> = {
       campagne_id: selectedCampagne === "" ? null : selectedCampagne,
     };
-    if (resetStatut) updates.statut = "en_attente";
+    if (resetStatut) {
+      updates.statut = "en_attente";
+      updates.temperature = "froid";
+    }
     const { error } = await supabase.from("prospects").update(updates).eq("id", prospectId);
     if (error) {
       setToast({ message: "Erreur lors de la mise à jour.", type: "error" });
     } else {
       setCampagneId(updates.campagne_id as string | null);
-      if (resetStatut) setStatut("en_attente");
+      if (resetStatut) {
+        setStatut("en_attente");
+        setTemperatureState("froid");
+      }
       setToast({ message: "Campagne mise à jour.", type: "success" });
       setShowCampagneEdit(false);
       router.refresh();
