@@ -3,15 +3,35 @@ import { createClient } from "@/lib/supabase/server";
 
 async function getStats() {
   const supabase = await createClient();
-  const [{ count: total }, { count: envoyes }, { count: reponses }, { count: rdv }] =
-    await Promise.all([
-      supabase.from("prospects").select("*", { count: "exact", head: true }),
-      // Compter les vrais messages envoyés via WhatsApp (conversations sortantes)
-      supabase.from("conversations").select("*", { count: "exact", head: true }).eq("direction", "sortant"),
-      supabase.from("prospects").select("*", { count: "exact", head: true }).eq("statut", "repondu"),
-      supabase.from("prospects").select("*", { count: "exact", head: true }).eq("statut", "rdv"),
-    ]);
-  return { total: total ?? 0, envoyes: envoyes ?? 0, reponses: reponses ?? 0, rdv: rdv ?? 0 };
+  const [
+    { count: total },
+    { count: envoyes },
+    { count: reponses },
+    { count: rdv },
+    { count: froids },
+    { count: tiedes },
+    { count: chauds },
+    { count: brulants },
+  ] = await Promise.all([
+    supabase.from("prospects").select("*", { count: "exact", head: true }),
+    supabase.from("conversations").select("*", { count: "exact", head: true }).eq("direction", "sortant"),
+    supabase.from("prospects").select("*", { count: "exact", head: true }).eq("statut", "repondu"),
+    supabase.from("prospects").select("*", { count: "exact", head: true }).eq("statut", "rdv"),
+    supabase.from("prospects").select("*", { count: "exact", head: true }).eq("temperature", "froid"),
+    supabase.from("prospects").select("*", { count: "exact", head: true }).eq("temperature", "tiede"),
+    supabase.from("prospects").select("*", { count: "exact", head: true }).eq("temperature", "chaud"),
+    supabase.from("prospects").select("*", { count: "exact", head: true }).eq("temperature", "brulant"),
+  ]);
+  return {
+    total: total ?? 0,
+    envoyes: envoyes ?? 0,
+    reponses: reponses ?? 0,
+    rdv: rdv ?? 0,
+    froids: froids ?? 0,
+    tiedes: tiedes ?? 0,
+    chauds: chauds ?? 0,
+    brulants: brulants ?? 0,
+  };
 }
 
 const statsConfig = [
@@ -112,6 +132,45 @@ export default async function DashboardPage() {
           </div>
         ))}
       </div>
+
+      {/* Répartition par température */}
+      {stats.total > 0 && (
+        <div className="rounded-2xl p-6 glass mb-8">
+          <h2 className="text-sm font-semibold text-white/70 mb-5">Température des prospects</h2>
+          <div className="grid grid-cols-4 gap-4 mb-5">
+            {[
+              { label: "Froid", count: stats.froids, color: "#0ea5e9" },
+              { label: "Tiède", count: stats.tiedes, color: "#f59e0b" },
+              { label: "Chaud", count: stats.chauds, color: "#f97316" },
+              { label: "Brûlant", count: stats.brulants, color: "#ef4444" },
+            ].map((t) => (
+              <div key={t.label} className="text-center">
+                <p className="text-2xl font-bold text-white">{t.count}</p>
+                <p className="text-xs mt-1" style={{ color: t.color }}>{t.label}</p>
+              </div>
+            ))}
+          </div>
+          {/* Barre visuelle */}
+          <div className="w-full rounded-full h-2.5 flex overflow-hidden" style={{ background: "rgba(255,255,255,0.07)" }}>
+            {[
+              { count: stats.froids, color: "#0ea5e9" },
+              { count: stats.tiedes, color: "#f59e0b" },
+              { count: stats.chauds, color: "#f97316" },
+              { count: stats.brulants, color: "#ef4444" },
+            ].map((t, i) => {
+              const pct = stats.total > 0 ? (t.count / stats.total) * 100 : 0;
+              if (pct === 0) return null;
+              return (
+                <div
+                  key={i}
+                  className="h-2.5 transition-all"
+                  style={{ width: `${pct}%`, background: t.color }}
+                />
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {stats.total > 0 && stats.envoyes > 0 && (
         <div className="rounded-2xl p-6 glass">

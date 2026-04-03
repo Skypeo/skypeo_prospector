@@ -5,6 +5,8 @@ export type ProspectStatut =
   | "rdv"
   | "refus";
 
+export type ProspectTemperature = "froid" | "tiede" | "chaud" | "brulant";
+
 export type CampagneStatut = "active" | "pause" | "terminee";
 
 export type MessageDirection = "entrant" | "sortant";
@@ -17,6 +19,7 @@ export interface Prospect {
   activite: string | null;
   ville: string | null;
   statut: ProspectStatut;
+  temperature: ProspectTemperature;
   campagne_id: string | null;
   created_at: string;
 }

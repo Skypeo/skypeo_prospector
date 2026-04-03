@@ -2,7 +2,8 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import StatutBadge from "@/components/StatutBadge";
-import type { ProspectStatut } from "@/types/database";
+import TemperatureBadge from "@/components/TemperatureBadge";
+import type { ProspectStatut, ProspectTemperature } from "@/types/database";
 import ProspectActions from "./ProspectActions";
 
 export default async function ProspectDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -42,7 +43,10 @@ export default async function ProspectDetailPage({ params }: { params: Promise<{
             {prospect.societe ?? "—"} · {prospect.ville ?? "—"}
           </p>
         </div>
-        <StatutBadge statut={prospect.statut as ProspectStatut} />
+        <div className="flex items-center gap-2">
+          <TemperatureBadge temperature={(prospect.temperature ?? "froid") as ProspectTemperature} />
+          <StatutBadge statut={prospect.statut as ProspectStatut} />
+        </div>
       </div>
 
       {/* Infos */}
@@ -63,6 +67,7 @@ export default async function ProspectDetailPage({ params }: { params: Promise<{
       <ProspectActions
         prospectId={prospect.id}
         currentStatut={prospect.statut as ProspectStatut}
+        currentTemperature={(prospect.temperature ?? "froid") as ProspectTemperature}
         currentCampagneId={prospect.campagne_id ?? null}
         campagnes={campagnes ?? []}
       />

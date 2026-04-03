@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import StatutBadge from "@/components/StatutBadge";
+import TemperatureBadge from "@/components/TemperatureBadge";
 import { SearchInput, DeleteProspectButton, CsvUploaderWrapper, PaginationControls, AddProspectButton } from "./ProspectsClient";
 import { Suspense } from "react";
-import type { ProspectStatut } from "@/types/database";
+import type { ProspectStatut, ProspectTemperature } from "@/types/database";
 
 const STATUTS: { value: ProspectStatut | "tous"; label: string }[] = [
   { value: "tous", label: "Tous" },
@@ -14,15 +15,23 @@ const STATUTS: { value: ProspectStatut | "tous"; label: string }[] = [
   { value: "refus", label: "Refus" },
 ];
 
+const TEMPERATURES: { value: ProspectTemperature | "toutes"; label: string }[] = [
+  { value: "toutes", label: "Toutes" },
+  { value: "froid", label: "Froid" },
+  { value: "tiede", label: "Tiède" },
+  { value: "chaud", label: "Chaud" },
+  { value: "brulant", label: "Brûlant" },
+];
+
 const PAGE_SIZE = 20;
 
 export default async function ProspectsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ statut?: string; q?: string; campagne?: string; page?: string }>;
+  searchParams: Promise<{ statut?: string; temperature?: string; q?: string; campagne?: string; page?: string }>;
 }) {
   const supabase = await createClient();
-  const { statut, q: qRaw, campagne: campagneFilter, page: pageParam } = await searchParams;
+  const { statut, temperature, q: qRaw, campagne: campagneFilter, page: pageParam } = await searchParams;
   const q = qRaw?.trim();
   const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
   const from = (page - 1) * PAGE_SIZE;
@@ -34,6 +43,7 @@ export default async function ProspectsPage({
 
   let baseQuery = supabase.from("prospects").select("*", { count: "exact" });
   if (statut && statut !== "tous") baseQuery = baseQuery.eq("statut", statut);
+  if (temperature && temperature !== "toutes") baseQuery = baseQuery.eq("temperature", temperature);
   if (q) baseQuery = baseQuery.or(`nom.ilike.%${q}%,societe.ilike.%${q}%,ville.ilike.%${q}%`);
   if (campagneFilter && campagneFilter !== "toutes") {
     if (campagneFilter === "aucune") {
@@ -49,7 +59,7 @@ export default async function ProspectsPage({
 
   const totalCount = count ?? 0;
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
-  const hasFilters = !!(statut && statut !== "tous") || !!q || !!(campagneFilter && campagneFilter !== "toutes");
+  const hasFilters = !!(statut && statut !== "tous") || !!(temperature && temperature !== "toutes") || !!q || !!(campagneFilter && campagneFilter !== "toutes");
   const campagneName = campagnes?.find((c) => c.id === campagneFilter)?.nom;
 
   return (
@@ -74,13 +84,14 @@ export default async function ProspectsPage({
         </div>
       </div>
 
-      {/* Filtres statut */}
+      {/* Filtres statut + température */}
       <div className="flex items-center gap-2 mb-3 flex-wrap">
         {STATUTS.map((s) => {
           const current = statut ?? "tous";
           const active = current === s.value;
           const href = new URLSearchParams({
             ...(s.value !== "tous" ? { statut: s.value } : {}),
+            ...(temperature && temperature !== "toutes" ? { temperature } : {}),
             ...(campagneFilter && campagneFilter !== "toutes" ? { campagne: campagneFilter } : {}),
             ...(q ? { q } : {}),
           }).toString();
@@ -100,6 +111,35 @@ export default async function ProspectsPage({
           );
         })}
 
+        {/* Séparateur */}
+        <div className="w-px h-5 bg-white/10 mx-1" />
+
+        {/* Filtre température */}
+        {TEMPERATURES.map((t) => {
+          const current = temperature ?? "toutes";
+          const active = current === t.value;
+          const href = new URLSearchParams({
+            ...(statut && statut !== "tous" ? { statut } : {}),
+            ...(t.value !== "toutes" ? { temperature: t.value } : {}),
+            ...(campagneFilter && campagneFilter !== "toutes" ? { campagne: campagneFilter } : {}),
+            ...(q ? { q } : {}),
+          }).toString();
+          return (
+            <Link
+              key={t.value}
+              href={`/prospects${href ? `?${href}` : ""}`}
+              className={`px-3.5 py-1.5 rounded-xl text-sm font-medium transition-all ${
+                active
+                  ? "text-white border border-orange-500/30"
+                  : "text-white/45 border border-white/8 hover:text-white hover:border-white/15"
+              }`}
+              style={active ? { background: "rgba(249,115,22,0.2)" } : {}}
+            >
+              {t.label}
+            </Link>
+          );
+        })}
+
         {/* Filtre campagne */}
         {campagnes && campagnes.length > 0 && (
           <div className="ml-auto flex items-center gap-2">
@@ -109,6 +149,7 @@ export default async function ProspectsPage({
                 const active = (campagneFilter ?? "toutes") === c.id;
                 const href = new URLSearchParams({
                   ...(statut && statut !== "tous" ? { statut } : {}),
+                  ...(temperature && temperature !== "toutes" ? { temperature } : {}),
                   ...(c.id !== "toutes" ? { campagne: c.id } : {}),
                   ...(q ? { q } : {}),
                 }).toString();
@@ -162,6 +203,7 @@ export default async function ProspectsPage({
                 <th className="px-5 py-3.5 text-left text-xs font-semibold text-white/35 uppercase tracking-wider">Téléphone</th>
                 <th className="px-5 py-3.5 text-left text-xs font-semibold text-white/35 uppercase tracking-wider">Ville</th>
                 <th className="px-5 py-3.5 text-left text-xs font-semibold text-white/35 uppercase tracking-wider">Statut</th>
+                <th className="px-5 py-3.5 text-left text-xs font-semibold text-white/35 uppercase tracking-wider">Température</th>
                 <th className="px-5 py-3.5 text-left text-xs font-semibold text-white/35 uppercase tracking-wider">Créé le</th>
                 <th className="px-5 py-3.5" />
               </tr>
@@ -179,6 +221,9 @@ export default async function ProspectsPage({
                   <td className="px-5 py-3.5 text-white/50">{p.ville ?? "—"}</td>
                   <td className="px-5 py-3.5">
                     <StatutBadge statut={p.statut as ProspectStatut} />
+                  </td>
+                  <td className="px-5 py-3.5">
+                    <TemperatureBadge temperature={(p.temperature ?? "froid") as ProspectTemperature} />
                   </td>
                   <td className="px-5 py-3.5 text-white/30 text-xs">
                     {new Date(p.created_at).toLocaleDateString("fr-FR")}

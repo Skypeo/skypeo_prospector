@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import type { ProspectStatut } from "@/types/database";
+import type { ProspectStatut, ProspectTemperature } from "@/types/database";
 import Toast from "@/components/Toast";
 
 const STATUTS: { value: ProspectStatut; label: string }[] = [
@@ -14,14 +14,23 @@ const STATUTS: { value: ProspectStatut; label: string }[] = [
   { value: "refus", label: "Refus" },
 ];
 
+const TEMPERATURES: { value: ProspectTemperature; label: string; color: string }[] = [
+  { value: "froid",   label: "Froid",   color: "#0ea5e9" },
+  { value: "tiede",   label: "Tiède",   color: "#f59e0b" },
+  { value: "chaud",   label: "Chaud",   color: "#f97316" },
+  { value: "brulant", label: "Brûlant", color: "#ef4444" },
+];
+
 export default function ProspectActions({
   prospectId,
   currentStatut,
+  currentTemperature,
   currentCampagneId,
   campagnes,
 }: {
   prospectId: string;
   currentStatut: ProspectStatut;
+  currentTemperature: ProspectTemperature;
   currentCampagneId: string | null;
   campagnes: { id: string; nom: string }[];
 }) {
@@ -32,6 +41,10 @@ export default function ProspectActions({
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+
+  // Température
+  const [temperatureState, setTemperatureState] = useState<ProspectTemperature>(currentTemperature);
+  const [savingTemp, setSavingTemp] = useState(false);
 
   // Campagne
   const [campagneId, setCampagneId] = useState<string | null>(currentCampagneId);
@@ -54,6 +67,21 @@ export default function ProspectActions({
     }
     setPendingStatut(null);
     setSaving(false);
+  }
+
+  async function handleTemperatureChange(newTemp: ProspectTemperature) {
+    if (newTemp === temperatureState) return;
+    setSavingTemp(true);
+    const supabase = createClient();
+    const { error } = await supabase.from("prospects").update({ temperature: newTemp }).eq("id", prospectId);
+    if (error) {
+      setToast({ message: "Erreur lors de la mise à jour.", type: "error" });
+    } else {
+      setTemperatureState(newTemp);
+      setToast({ message: "Température mise à jour.", type: "success" });
+      router.refresh();
+    }
+    setSavingTemp(false);
   }
 
   async function handleSaveCampagne() {
@@ -174,6 +202,31 @@ export default function ProspectActions({
             </button>
           </div>
         )}
+      </div>
+
+      {/* Température */}
+      <div className="rounded-2xl p-5 mb-5 glass">
+        <h2 className="text-sm font-semibold text-white/60 mb-3">Température du prospect</h2>
+        <div className="flex flex-wrap gap-2">
+          {TEMPERATURES.map((t) => {
+            const isActive = t.value === temperatureState;
+            return (
+              <button
+                key={t.value}
+                onClick={() => handleTemperatureChange(t.value)}
+                disabled={savingTemp}
+                className="px-4 py-1.5 rounded-xl text-sm font-medium transition-all disabled:opacity-50"
+                style={
+                  isActive
+                    ? { background: `${t.color}25`, border: `1px solid ${t.color}50`, color: t.color }
+                    : { background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.55)" }
+                }
+              >
+                {t.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Campagne */}

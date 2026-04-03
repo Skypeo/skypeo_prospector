@@ -35,12 +35,19 @@ supabase/schema.sql          # Schéma SQL + RLS à exécuter dans Supabase
 ```
 
 ## Tables Supabase
-- **prospects** — id, nom, société, téléphone, activité, ville, statut, created_at
+- **prospects** — id, nom, société, téléphone, activité, ville, statut, temperature, created_at
 - **conversations** — id, prospect_id, message, direction, timestamp
 - **campagnes** — id, nom, nb_envois_par_jour, statut, created_at
 
 ## Statuts prospect
 `en_attente` → `envoye` → `repondu` → `rdv` ou `refus`
+
+## Température prospect (lead scoring)
+`froid` → `tiede` → `chaud` → `brulant`
+- Froid : jamais contacté ou aucun intérêt
+- Tiède : léger intérêt, a répondu vaguement
+- Chaud : intéressé, pose des questions
+- Brûlant : prêt à acheter / veut un RDV
 
 ## Setup
 1. Copier `.env.local.example` → `.env.local` et remplir les clés Supabase

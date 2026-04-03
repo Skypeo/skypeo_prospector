@@ -80,6 +80,16 @@ alter table public.prospects
   add column if not exists campagne_id uuid references public.campagnes(id) on delete set null;
 
 -- =============================================
+-- Migration : température prospect (lead scoring)
+-- =============================================
+
+alter table public.prospects
+  add column if not exists temperature text not null default 'froid'
+    check (temperature in ('froid', 'tiede', 'chaud', 'brulant'));
+
+create index if not exists prospects_temperature_idx on public.prospects(temperature);
+
+-- =============================================
 -- Table settings (prompt agent IA)
 -- =============================================
 

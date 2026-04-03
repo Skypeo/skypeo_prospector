@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "WebFetch(domain:skypeo.fr)"
+      "WebFetch(domain:skypeo.fr)",
+      "Bash(npx next:*)"
     ]
   }
 }
