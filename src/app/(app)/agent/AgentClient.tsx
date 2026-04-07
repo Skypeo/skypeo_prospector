@@ -3,8 +3,15 @@
 import { useState, useCallback } from "react";
 import Toast from "@/components/Toast";
 
-export default function AgentClient({ initialPrompt }: { initialPrompt: string }) {
+export default function AgentClient({
+  initialPrompt,
+  initialTimWhatsapp,
+}: {
+  initialPrompt: string;
+  initialTimWhatsapp: string;
+}) {
   const [prompt, setPrompt] = useState(initialPrompt);
+  const [timWhatsapp, setTimWhatsapp] = useState(initialTimWhatsapp);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const clearToast = useCallback(() => setToast(null), []);
@@ -15,10 +22,10 @@ export default function AgentClient({ initialPrompt }: { initialPrompt: string }
       const res = await fetch("/api/settings", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt }),
+        body: JSON.stringify({ prompt, tim_whatsapp: timWhatsapp }),
       });
       if (!res.ok) throw new Error();
-      setToast({ message: "Prompt sauvegardé", type: "success" });
+      setToast({ message: "Réglages sauvegardés", type: "success" });
     } catch {
       setToast({ message: "Erreur lors de la sauvegarde", type: "error" });
     } finally {
@@ -51,6 +58,29 @@ export default function AgentClient({ initialPrompt }: { initialPrompt: string }
           )}
           Sauvegarder
         </button>
+      </div>
+
+      {/* Notifications WhatsApp Tim */}
+      <div className="rounded-2xl glass mb-6 p-5">
+        <div className="flex items-center gap-2 mb-3">
+          <div
+            className="w-2 h-2 rounded-full"
+            style={{ background: "linear-gradient(135deg, #008f78, #2b3475)" }}
+          />
+          <span className="text-sm font-medium text-white/70">Notifications WhatsApp — Tim</span>
+        </div>
+        <p className="text-xs text-white/40 mb-3">
+          Numéro WhatsApp qui reçoit les alertes lorsqu&apos;un prospect devient chaud ou demande un RDV.
+          Format international avec indicatif (ex : +33612345678).
+        </p>
+        <input
+          type="tel"
+          value={timWhatsapp}
+          onChange={(e) => setTimWhatsapp(e.target.value)}
+          placeholder="+33612345678"
+          className="w-full max-w-md px-4 py-2.5 rounded-xl text-sm text-white placeholder-white/25 focus:outline-none focus:ring-2 focus:ring-brand-600/50 transition-all"
+          style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}
+        />
       </div>
 
       <div className="rounded-2xl glass overflow-hidden">

@@ -35,9 +35,17 @@ supabase/schema.sql          # Schéma SQL + RLS à exécuter dans Supabase
 ```
 
 ## Tables Supabase
-- **prospects** — id, nom, société, téléphone, activité, ville, statut, temperature, created_at
+- **prospects** — id, nom, société, téléphone, activité, ville, statut, temperature, notif_chaud_envoyee, notif_brulant_envoyee, created_at
 - **conversations** — id, prospect_id, message, direction, timestamp
 - **campagnes** — id, nom, nb_envois_par_jour, statut, created_at
+- **settings** — id (=1), prompt, tim_whatsapp, updated_at
+
+## Notifications WhatsApp Tim
+Quand un prospect devient `chaud` (statut `repondu`) ou `brûlant` (statut `rdv`), Tim reçoit automatiquement une notification WhatsApp via Twilio. Architecture : Database Webhook Supabase → workflow n8n → Twilio Content Templates. Voir `docs/setup-notif-tim.md` pour la procédure complète. Anti-spam : 1 notif max par niveau (chaud/brûlant) par prospect.
+
+## Sécurité
+- **Aucun secret en dur** dans les fichiers commités. Le dossier `n8n-workflows/` est dans `.gitignore` car les workflows contiennent des credentials Twilio + Supabase service_role.
+- Les numéros de téléphone perso ne doivent **jamais** être hardcodés dans le code, ils vivent en base (`settings.tim_whatsapp` modifiable depuis `/agent`).
 
 ## Statuts prospect
 `en_attente` → `envoye` → `repondu` → `rdv` ou `refus`

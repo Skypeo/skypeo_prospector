@@ -6,11 +6,12 @@ export default async function AgentPage() {
   const supabase = await createClient();
   const { data } = await supabase
     .from("settings")
-    .select("prompt")
+    .select("prompt, tim_whatsapp")
     .eq("id", 1)
     .single();
 
   const prompt = data?.prompt || DEFAULT_AGENT_PROMPT;
+  const timWhatsapp = data?.tim_whatsapp || "";
 
-  return <AgentClient initialPrompt={prompt} />;
+  return <AgentClient initialPrompt={prompt} initialTimWhatsapp={timWhatsapp} />;
 }

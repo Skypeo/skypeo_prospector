@@ -96,9 +96,15 @@ create index if not exists prospects_temperature_idx on public.prospects(tempera
 create table if not exists public.settings (
   id integer primary key default 1,
   prompt text not null default '',
+  tim_whatsapp text not null default '',
   updated_at timestamptz default now() not null,
   constraint single_row check (id = 1)
 );
+
+-- Flags anti-spam pour les notifs WhatsApp Tim
+alter table public.prospects
+  add column if not exists notif_chaud_envoyee boolean not null default false,
+  add column if not exists notif_brulant_envoyee boolean not null default false;
 
 alter table public.settings enable row level security;
 
