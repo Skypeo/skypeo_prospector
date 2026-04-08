@@ -106,6 +106,42 @@ alter table public.prospects
   add column if not exists notif_chaud_envoyee boolean not null default false,
   add column if not exists notif_brulant_envoyee boolean not null default false;
 
+-- =============================================
+-- Migration : Numéro d'import auto-incrémenté
+-- (sélection par range dans la création de campagnes)
+-- =============================================
+
+create sequence if not exists public.prospects_numero_import_seq;
+
+alter table public.prospects
+  add column if not exists numero_import bigint;
+
+with ordered as (
+  select id, row_number() over (order by created_at asc) as rn
+  from public.prospects
+  where numero_import is null
+)
+update public.prospects p
+set numero_import = ordered.rn
+from ordered
+where p.id = ordered.id;
+
+select setval(
+  'public.prospects_numero_import_seq',
+  coalesce((select max(numero_import) from public.prospects), 0) + 1,
+  false
+);
+
+alter table public.prospects
+  alter column numero_import set not null,
+  alter column numero_import set default nextval('public.prospects_numero_import_seq');
+
+alter sequence public.prospects_numero_import_seq
+  owned by public.prospects.numero_import;
+
+create unique index if not exists prospects_numero_import_idx
+  on public.prospects(numero_import);
+
 alter table public.settings enable row level security;
 
 create policy "Authenticated users can manage settings"

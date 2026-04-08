@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import CampagnesClient, { CampagneActions } from "./CampagnesClient";
+import CampagnesClient, { CampagneActions, CampagneCardLink } from "./CampagnesClient";
 import type { CampagneStatut } from "@/types/database";
 
 const statutConfig: Record<CampagneStatut, { label: string; dot: string }> = {
@@ -56,23 +56,28 @@ export default async function CampagnesPage() {
             const progress = total > 0 ? Math.round(((total - stats.en_attente) / total) * 100) : 0;
 
             return (
-              <div key={c.id} className="rounded-2xl glass overflow-hidden">
+              <div key={c.id} className="rounded-2xl glass overflow-hidden relative group transition-all hover:bg-white/[0.02]">
+                {/* Bouton transparent qui couvre toute la card sauf les actions, ouvre la modal prospects */}
+                <CampagneCardLink campagneId={c.id} campagneNom={c.nom} />
+
                 {/* Header */}
-                <div className="flex items-center justify-between px-5 py-4 gap-4">
+                <div className="flex items-center justify-between px-5 py-4 gap-4 relative pointer-events-none">
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className={`w-2 h-2 rounded-full shrink-0 ${dot}`} />
-                      <h3 className="font-semibold text-white truncate">{c.nom}</h3>
+                      <h3 className="font-semibold text-white truncate group-hover:text-brand-300 transition-colors">{c.nom}</h3>
                     </div>
                     <span className="text-xs text-white/30 shrink-0">{label}</span>
                     <span className="text-xs text-white/20 shrink-0">·</span>
                     <span className="text-xs text-white/30 shrink-0">{c.nb_envois_par_jour} / jour</span>
                   </div>
-                  <CampagneActions campagneId={c.id} currentStatut={statut} enAttenteCount={stats.en_attente} />
+                  <div className="pointer-events-auto relative z-10">
+                    <CampagneActions campagneId={c.id} currentStatut={statut} enAttenteCount={stats.en_attente} />
+                  </div>
                 </div>
 
                 {/* Stats + progress */}
-                <div className="px-5 pb-4 border-t" style={{ borderColor: "rgba(255,255,255,0.05)" }}>
+                <div className="px-5 pb-4 border-t relative pointer-events-none" style={{ borderColor: "rgba(255,255,255,0.05)" }}>
                   {total === 0 ? (
                     <p className="text-xs text-white/25 pt-3">Aucun prospect — importez un CSV via le bouton ci-dessus</p>
                   ) : (

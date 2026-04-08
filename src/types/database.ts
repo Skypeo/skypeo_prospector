@@ -21,6 +21,7 @@ export interface Prospect {
   statut: ProspectStatut;
   temperature: ProspectTemperature;
   campagne_id: string | null;
+  numero_import: number;
   created_at: string;
 }
 

@@ -1,10 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import CsvUploader from "@/components/CsvUploader";
-import type { CampagneStatut } from "@/types/database";
+import StatutBadge from "@/components/StatutBadge";
+import TemperatureBadge from "@/components/TemperatureBadge";
+import type { CampagneStatut, ProspectStatut, ProspectTemperature } from "@/types/database";
 
 function CreateModal({ onClose }: { onClose: () => void }) {
   const router = useRouter();
@@ -60,13 +63,18 @@ function CreateModal({ onClose }: { onClose: () => void }) {
 
 function SelectProspectsModal({ campagneId, onClose }: { campagneId: string; onClose: () => void }) {
   const router = useRouter();
-  const [prospects, setProspects] = useState<{ id: string; nom: string; societe: string | null; ville: string | null }[]>([]);
+  const [prospects, setProspects] = useState<{ id: string; nom: string; societe: string | null; ville: string | null; numero_import: number }[]>([]);
   const [totalDispo, setTotalDispo] = useState(0);
+  const [maxNumeroImport, setMaxNumeroImport] = useState(0);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
+  const [quickMode, setQuickMode] = useState<"premiers" | "range">("premiers");
   const [quickN, setQuickN] = useState("");
+  const [rangeStart, setRangeStart] = useState("");
+  const [rangeEnd, setRangeEnd] = useState("");
+  const [rangeCount, setRangeCount] = useState<number | null>(null);
   const [quickSaving, setQuickSaving] = useState(false);
 
   async function fetchProspects(q?: string) {
@@ -74,10 +82,10 @@ function SelectProspectsModal({ campagneId, onClose }: { campagneId: string; onC
     const supabase = createClient();
     let query = supabase
       .from("prospects")
-      .select("id, nom, societe, ville")
+      .select("id, nom, societe, ville, numero_import")
       .is("campagne_id", null)
       .eq("statut", "en_attente")
-      .order("created_at", { ascending: true })
+      .order("numero_import", { ascending: true })
       .limit(200);
     if (q) query = query.or(`nom.ilike.%${q}%,societe.ilike.%${q}%,ville.ilike.%${q}%`);
     const { data } = await query;
@@ -94,10 +102,40 @@ function SelectProspectsModal({ campagneId, onClose }: { campagneId: string; onC
         .is("campagne_id", null)
         .eq("statut", "en_attente");
       setTotalDispo(count ?? 0);
+      const { data: maxRow } = await supabase
+        .from("prospects")
+        .select("numero_import")
+        .order("numero_import", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      setMaxNumeroImport(maxRow?.numero_import ?? 0);
       await fetchProspects();
     })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Compteur dynamique pour le mode range : on compte combien de prospects
+  // disponibles tombent vraiment dans la plage [rangeStart, rangeEnd]
+  useEffect(() => {
+    const start = parseInt(rangeStart);
+    const end = parseInt(rangeEnd);
+    if (!start || !end || start > end) {
+      setRangeCount(null);
+      return;
+    }
+    const t = setTimeout(async () => {
+      const supabase = createClient();
+      const { count } = await supabase
+        .from("prospects")
+        .select("*", { count: "exact", head: true })
+        .is("campagne_id", null)
+        .eq("statut", "en_attente")
+        .gte("numero_import", start)
+        .lte("numero_import", end);
+      setRangeCount(count ?? 0);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [rangeStart, rangeEnd]);
 
   useEffect(() => {
     const t = setTimeout(() => fetchProspects(search || undefined), 300);
@@ -126,24 +164,50 @@ function SelectProspectsModal({ campagneId, onClose }: { campagneId: string; onC
   }
 
   async function assignerRapide() {
-    const n = parseInt(quickN);
-    if (!n || n <= 0) return;
-    setQuickSaving(true);
     const supabase = createClient();
-    const { data } = await supabase
-      .from("prospects")
-      .select("id")
-      .is("campagne_id", null)
-      .eq("statut", "en_attente")
-      .order("created_at", { ascending: true })
-      .limit(n);
-    if (data && data.length > 0) {
-      await supabase.from("prospects").update({ campagne_id: campagneId }).in("id", data.map((p) => p.id));
+    let ids: string[] = [];
+
+    if (quickMode === "premiers") {
+      const n = parseInt(quickN);
+      if (!n || n <= 0) return;
+      setQuickSaving(true);
+      const { data } = await supabase
+        .from("prospects")
+        .select("id")
+        .is("campagne_id", null)
+        .eq("statut", "en_attente")
+        .order("numero_import", { ascending: true })
+        .limit(n);
+      ids = (data ?? []).map((p) => p.id);
+    } else {
+      const start = parseInt(rangeStart);
+      const end = parseInt(rangeEnd);
+      if (!start || !end || start > end) return;
+      setQuickSaving(true);
+      const { data } = await supabase
+        .from("prospects")
+        .select("id")
+        .is("campagne_id", null)
+        .eq("statut", "en_attente")
+        .gte("numero_import", start)
+        .lte("numero_import", end)
+        .order("numero_import", { ascending: true });
+      ids = (data ?? []).map((p) => p.id);
+    }
+
+    if (ids.length > 0) {
+      await supabase.from("prospects").update({ campagne_id: campagneId }).in("id", ids);
     }
     setQuickSaving(false);
     router.refresh();
     onClose();
   }
+
+  const quickDisabled =
+    quickSaving ||
+    (quickMode === "premiers"
+      ? !quickN || parseInt(quickN) <= 0
+      : !rangeStart || !rangeEnd || parseInt(rangeStart) > parseInt(rangeEnd));
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 backdrop-blur-sm">
@@ -161,26 +225,91 @@ function SelectProspectsModal({ campagneId, onClose }: { campagneId: string; onC
           </div>
 
           {/* Sélection rapide */}
-          <div className="flex items-center gap-2 mb-3 p-3 rounded-xl" style={{ background: "rgba(0,143,120,0.08)", border: "1px solid rgba(0,143,120,0.2)" }}>
-            <span className="text-xs text-white/50 shrink-0">Sélection rapide</span>
-            <input
-              type="number"
-              value={quickN}
-              onChange={(e) => setQuickN(e.target.value)}
-              placeholder={`1 – ${totalDispo}`}
-              min={1}
-              max={totalDispo}
-              className="flex-1 px-3 py-1.5 rounded-lg text-sm text-white placeholder-white/25 focus:outline-none focus:ring-1 focus:ring-brand-500/50"
-              style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)" }}
-            />
-            <button
-              onClick={assignerRapide}
-              disabled={quickSaving || !quickN || parseInt(quickN) <= 0}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white disabled:opacity-40 shrink-0 transition-all"
-              style={{ background: "linear-gradient(135deg, #008f78, #2b3475)" }}
-            >
-              {quickSaving ? "..." : "Assigner"}
-            </button>
+          <div className="mb-3 p-3 rounded-xl space-y-2" style={{ background: "rgba(0,143,120,0.08)", border: "1px solid rgba(0,143,120,0.2)" }}>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs text-white/50">Sélection rapide</span>
+              <div className="flex gap-1 p-0.5 rounded-lg" style={{ background: "rgba(0,0,0,0.25)" }}>
+                <button
+                  onClick={() => setQuickMode("premiers")}
+                  className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-all ${quickMode === "premiers" ? "text-white" : "text-white/40 hover:text-white/70"}`}
+                  style={quickMode === "premiers" ? { background: "rgba(0,143,120,0.4)" } : {}}
+                >
+                  Les N premiers
+                </button>
+                <button
+                  onClick={() => setQuickMode("range")}
+                  className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-all ${quickMode === "range" ? "text-white" : "text-white/40 hover:text-white/70"}`}
+                  style={quickMode === "range" ? { background: "rgba(0,143,120,0.4)" } : {}}
+                >
+                  Du X au Y
+                </button>
+              </div>
+            </div>
+
+            {quickMode === "premiers" ? (
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  value={quickN}
+                  onChange={(e) => setQuickN(e.target.value)}
+                  placeholder={`1 – ${totalDispo}`}
+                  min={1}
+                  max={totalDispo}
+                  className="flex-1 px-3 py-1.5 rounded-lg text-sm text-white placeholder-white/25 focus:outline-none focus:ring-1 focus:ring-brand-500/50"
+                  style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)" }}
+                />
+                <button
+                  onClick={assignerRapide}
+                  disabled={quickDisabled}
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white disabled:opacity-40 shrink-0 transition-all"
+                  style={{ background: "linear-gradient(135deg, #008f78, #2b3475)" }}
+                >
+                  {quickSaving ? "..." : "Assigner"}
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-white/40 shrink-0">Du</span>
+                  <input
+                    type="number"
+                    value={rangeStart}
+                    onChange={(e) => setRangeStart(e.target.value)}
+                    placeholder="500"
+                    min={1}
+                    max={maxNumeroImport || undefined}
+                    className="flex-1 min-w-0 px-3 py-1.5 rounded-lg text-sm text-white placeholder-white/25 focus:outline-none focus:ring-1 focus:ring-brand-500/50"
+                    style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)" }}
+                  />
+                  <span className="text-[11px] text-white/40 shrink-0">au</span>
+                  <input
+                    type="number"
+                    value={rangeEnd}
+                    onChange={(e) => setRangeEnd(e.target.value)}
+                    placeholder="900"
+                    min={1}
+                    max={maxNumeroImport || undefined}
+                    className="flex-1 min-w-0 px-3 py-1.5 rounded-lg text-sm text-white placeholder-white/25 focus:outline-none focus:ring-1 focus:ring-brand-500/50"
+                    style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)" }}
+                  />
+                  <button
+                    onClick={assignerRapide}
+                    disabled={quickDisabled}
+                    className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white disabled:opacity-40 shrink-0 transition-all"
+                    style={{ background: "linear-gradient(135deg, #008f78, #2b3475)" }}
+                  >
+                    {quickSaving ? "..." : "Assigner"}
+                  </button>
+                </div>
+                <p className="text-[11px] text-white/40">
+                  {rangeCount === null
+                    ? `Numéros d'import disponibles : 1 – ${maxNumeroImport}`
+                    : rangeCount === 0
+                      ? "Aucun prospect disponible dans cette plage."
+                      : `${rangeCount} prospect${rangeCount > 1 ? "s" : ""} disponible${rangeCount > 1 ? "s" : ""} dans cette plage.`}
+                </p>
+              </>
+            )}
           </div>
 
           <input
@@ -214,10 +343,11 @@ function SelectProspectsModal({ campagneId, onClose }: { campagneId: string; onC
                     </svg>
                   )}
                 </div>
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <p className="text-sm text-white truncate">{p.nom || "—"}</p>
                   <p className="text-xs text-white/35 truncate">{[p.societe, p.ville].filter(Boolean).join(" · ")}</p>
                 </div>
+                <span className="text-[10px] text-white/30 font-mono shrink-0 tabular-nums">#{p.numero_import}</span>
               </div>
             ))
           )}
@@ -410,6 +540,184 @@ export function CampagneActions({
           </button>
         )}
       </div>
+    </>
+  );
+}
+
+type CampagneProspect = {
+  id: string;
+  numero_import: number;
+  nom: string;
+  societe: string | null;
+  ville: string | null;
+  telephone: string;
+  statut: ProspectStatut;
+  temperature: ProspectTemperature;
+};
+
+function CampagneProspectsModal({
+  campagneId,
+  campagneNom,
+  onClose,
+}: {
+  campagneId: string;
+  campagneNom: string;
+  onClose: () => void;
+}) {
+  const [prospects, setProspects] = useState<CampagneProspect[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    (async () => {
+      const supabase = createClient();
+      const { data } = await supabase
+        .from("prospects")
+        .select("id, numero_import, nom, societe, ville, telephone, statut, temperature")
+        .eq("campagne_id", campagneId)
+        .order("numero_import", { ascending: true });
+      setProspects((data ?? []) as CampagneProspect[]);
+      setLoading(false);
+    })();
+  }, [campagneId]);
+
+  const filtered = search.trim()
+    ? prospects.filter((p) => {
+        const q = search.toLowerCase();
+        return (
+          p.nom?.toLowerCase().includes(q) ||
+          p.societe?.toLowerCase().includes(q) ||
+          p.ville?.toLowerCase().includes(q) ||
+          p.telephone?.toLowerCase().includes(q)
+        );
+      })
+    : prospects;
+
+  return (
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 backdrop-blur-sm" onClick={onClose}>
+      <div
+        className="rounded-2xl w-full max-w-3xl mx-4 flex flex-col"
+        style={{ background: "#120d24", border: "1px solid rgba(0,143,120,0.2)", maxHeight: "85vh" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="px-5 py-4 border-b shrink-0" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
+          <div className="flex items-center justify-between mb-3">
+            <div className="min-w-0">
+              <h2 className="text-base font-bold text-white truncate">Prospects de « {campagneNom} »</h2>
+              <p className="text-xs text-white/40 mt-0.5">
+                {loading ? "Chargement..." : `${prospects.length} prospect${prospects.length > 1 ? "s" : ""} dans cette campagne`}
+              </p>
+            </div>
+            <button onClick={onClose} className="text-white/30 hover:text-white transition-colors shrink-0">
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Rechercher nom, société, ville, téléphone..."
+            className="w-full px-3.5 py-2 rounded-xl text-sm text-white placeholder-white/25 focus:outline-none focus:ring-1 focus:ring-brand-600/50"
+            style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}
+          />
+        </div>
+
+        {/* Liste */}
+        <div className="overflow-y-auto flex-1 min-h-0">
+          {loading ? (
+            <div className="p-12 text-center text-sm text-white/30">Chargement...</div>
+          ) : filtered.length === 0 ? (
+            <div className="p-12 text-center text-sm text-white/30">
+              {search ? "Aucun prospect ne correspond à cette recherche." : "Aucun prospect dans cette campagne."}
+            </div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead className="sticky top-0" style={{ background: "#120d24" }}>
+                <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+                  <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-white/35 uppercase tracking-wider">#</th>
+                  <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-white/35 uppercase tracking-wider">Nom</th>
+                  <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-white/35 uppercase tracking-wider">Société · Ville</th>
+                  <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-white/35 uppercase tracking-wider">Statut</th>
+                  <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-white/35 uppercase tracking-wider">Temp.</th>
+                  <th className="px-4 py-2.5" />
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((p, i) => (
+                  <tr
+                    key={p.id}
+                    className="hover:bg-white/3 transition-colors"
+                    style={{ borderBottom: i < filtered.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}
+                  >
+                    <td className="px-4 py-2.5 text-white/30 text-xs font-mono tabular-nums">#{p.numero_import}</td>
+                    <td className="px-4 py-2.5 text-white truncate max-w-[140px]">{p.nom || "—"}</td>
+                    <td className="px-4 py-2.5 text-white/50 text-xs truncate max-w-[220px]">
+                      {[p.societe, p.ville].filter(Boolean).join(" · ") || "—"}
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <StatutBadge statut={p.statut} />
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <TemperatureBadge temperature={p.temperature} />
+                    </td>
+                    <td className="px-4 py-2.5 text-right">
+                      <Link
+                        href={`/prospects/${p.id}`}
+                        className="text-brand-400 hover:text-brand-300 text-xs font-medium transition-colors"
+                      >
+                        Voir →
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-5 py-3 border-t shrink-0 flex items-center justify-between" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
+          <Link
+            href={`/prospects?campagne=${campagneId}`}
+            className="text-xs text-brand-400 hover:text-brand-300 transition-colors"
+          >
+            Ouvrir la vue complète →
+          </Link>
+          <button
+            onClick={onClose}
+            className="px-4 py-1.5 rounded-xl text-xs text-white/60 hover:text-white transition-colors"
+            style={{ background: "rgba(255,255,255,0.06)" }}
+          >
+            Fermer
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function CampagneCardLink({ campagneId, campagneNom }: { campagneId: string; campagneNom: string }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        aria-label={`Voir les prospects de ${campagneNom}`}
+        className="absolute inset-0 z-0 cursor-pointer"
+      />
+      {open && (
+        <CampagneProspectsModal
+          campagneId={campagneId}
+          campagneNom={campagneNom}
+          onClose={() => setOpen(false)}
+        />
+      )}
     </>
   );
 }

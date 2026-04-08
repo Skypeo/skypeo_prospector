@@ -2,7 +2,13 @@
   "permissions": {
     "allow": [
       "WebFetch(domain:skypeo.fr)",
-      "Bash(npx next:*)"
+      "Bash(npx next:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npm run:*)",
+      "Bash(curl:*)",
+      "Bash(ps -W)",
+      "Bash(taskkill:*)",
+      "Bash(rm:*)"
     ]
   }
 }
