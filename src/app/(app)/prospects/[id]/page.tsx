@@ -66,6 +66,7 @@ export default async function ProspectDetailPage({ params }: { params: Promise<{
       {/* Actions */}
       <ProspectActions
         prospectId={prospect.id}
+        prospectTelephone={prospect.telephone}
         currentStatut={prospect.statut as ProspectStatut}
         currentTemperature={(prospect.temperature ?? "froid") as ProspectTemperature}
         currentCampagneId={prospect.campagne_id ?? null}

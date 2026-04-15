@@ -33,17 +33,23 @@ function statutToTemperature(statut: ProspectStatut): ProspectTemperature {
 
 export default function ProspectActions({
   prospectId,
+  prospectTelephone,
   currentStatut,
   currentTemperature,
   currentCampagneId,
   campagnes,
 }: {
   prospectId: string;
+  prospectTelephone: string;
   currentStatut: ProspectStatut;
   currentTemperature: ProspectTemperature;
   currentCampagneId: string | null;
   campagnes: { id: string; nom: string }[];
 }) {
+  const testPhone = process.env.NEXT_PUBLIC_TEST_PROSPECT_PHONE;
+  const isTestProspect = !!testPhone && prospectTelephone === testPhone;
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetConfirm, setResetConfirm] = useState(false);
   const router = useRouter();
   const [statut, setStatut] = useState<ProspectStatut>(currentStatut);
   const [pendingStatut, setPendingStatut] = useState<ProspectStatut | null>(null);
@@ -122,6 +128,31 @@ export default function ProspectActions({
     setSavingCampagne(false);
   }
 
+  async function handleResetTest() {
+    setResetLoading(true);
+    const supabase = createClient();
+    await supabase.from("conversations").delete().eq("prospect_id", prospectId);
+    const { error } = await supabase
+      .from("prospects")
+      .update({
+        statut: "en_attente",
+        temperature: "froid",
+        notif_chaud_envoyee: false,
+        notif_brulant_envoyee: false,
+      })
+      .eq("id", prospectId);
+    if (error) {
+      setToast({ message: "Erreur lors du reset.", type: "error" });
+    } else {
+      setStatut("en_attente");
+      setTemperatureState("froid");
+      setToast({ message: "Prospect réinitialisé.", type: "success" });
+      router.refresh();
+    }
+    setResetConfirm(false);
+    setResetLoading(false);
+  }
+
   async function handleDelete() {
     setDeleteLoading(true);
     const supabase = createClient();
@@ -134,6 +165,53 @@ export default function ProspectActions({
 
   return (
     <>
+      {/* Reset test (visible uniquement sur le prospect de test) */}
+      {isTestProspect && (
+        <div
+          className="rounded-2xl p-5 mb-5"
+          style={{
+            background: "rgba(251,191,36,0.06)",
+            border: "1px solid rgba(251,191,36,0.2)",
+          }}
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-semibold text-amber-300/90">Mode test</h2>
+              <p className="text-xs text-white/40 mt-0.5">
+                Réinitialise ce prospect : supprime les conversations, remet statut/température et autorise les notifs Tim.
+              </p>
+            </div>
+            {resetConfirm ? (
+              <div className="flex items-center gap-2 shrink-0 ml-4">
+                <button
+                  onClick={handleResetTest}
+                  disabled={resetLoading}
+                  className="px-3 py-1.5 text-xs font-semibold rounded-lg text-amber-200 transition-colors disabled:opacity-50"
+                  style={{ background: "rgba(251,191,36,0.15)", border: "1px solid rgba(251,191,36,0.4)" }}
+                >
+                  {resetLoading ? "..." : "Confirmer reset"}
+                </button>
+                <button
+                  onClick={() => setResetConfirm(false)}
+                  className="px-3 py-1.5 text-xs rounded-lg text-white/40 hover:text-white transition-colors"
+                  style={{ background: "rgba(255,255,255,0.05)" }}
+                >
+                  Annuler
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setResetConfirm(true)}
+                className="px-3 py-1.5 text-xs font-medium rounded-xl text-amber-200/90 hover:text-amber-200 transition-all shrink-0 ml-4"
+                style={{ background: "rgba(251,191,36,0.1)", border: "1px solid rgba(251,191,36,0.25)" }}
+              >
+                Reset prospect
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Statut */}
       <div className="rounded-2xl p-5 mb-5 glass">
         <div className="flex items-center justify-between mb-3">
