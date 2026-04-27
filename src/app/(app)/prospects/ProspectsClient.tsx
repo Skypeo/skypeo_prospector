@@ -138,9 +138,11 @@ export function AddProspectButton() {
     if (!form.nom.trim() || !form.telephone.trim()) return;
     setLoading(true);
     const supabase = createClient();
+    const rawPhone = form.telephone.trim().replace(/\s/g, "");
+    const telephone = rawPhone.startsWith("0") ? "+33" + rawPhone.slice(1) : rawPhone;
     const { error } = await supabase.from("prospects").insert({
       nom: form.nom.trim(),
-      telephone: form.telephone.trim(),
+      telephone,
       societe: form.societe.trim() || null,
       activite: form.activite.trim() || null,
       ville: form.ville.trim() || null,
