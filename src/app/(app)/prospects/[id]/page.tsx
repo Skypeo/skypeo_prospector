@@ -1,5 +1,4 @@
 import { notFound } from "next/navigation";
-import { revalidatePath } from "next/cache";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import StatutBadge from "@/components/StatutBadge";
@@ -27,7 +26,6 @@ export default async function ProspectDetailPage({ params }: { params: Promise<{
     .from("prospects")
     .update({ derniere_consultation_at: new Date().toISOString() })
     .eq("id", id);
-  revalidatePath("/prospects");
 
   return (
     <div className="max-w-3xl">
