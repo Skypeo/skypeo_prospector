@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { getProspectsAvecNouvelleReponse } from "@/lib/nouvellesReponses";
 
 const navItems = [
   {
@@ -46,6 +48,21 @@ const navItems = [
 export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
+  const [newResponses, setNewResponses] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchNewResponses() {
+      const supabase = createClient();
+      const ids = await getProspectsAvecNouvelleReponse(supabase);
+      if (cancelled) return;
+      setNewResponses(ids.size);
+    }
+    fetchNewResponses();
+    return () => {
+      cancelled = true;
+    };
+  }, [pathname]);
 
   async function handleLogout() {
     const supabase = createClient();
@@ -73,6 +90,29 @@ export default function Sidebar() {
           </div>
         </div>
       </div>
+
+      {/* Alerte nouvelles réponses */}
+      {newResponses > 0 && (
+        <Link
+          href="/prospects?statut=repondu"
+          className="mx-3 mt-3 flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:brightness-110"
+          style={{
+            background: "linear-gradient(135deg, #dc2626, #b91c1c)",
+            boxShadow: "0 0 16px rgba(220,38,38,0.35)",
+          }}
+        >
+          <span className="relative flex h-2.5 w-2.5">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
+            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-white" />
+          </span>
+          <span className="flex-1">
+            {newResponses} nouvelle{newResponses > 1 ? "s" : ""} réponse{newResponses > 1 ? "s" : ""}
+          </span>
+          <svg className="w-4 h-4 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </Link>
+      )}
 
       {/* Nav */}
       <nav className="flex-1 p-3 space-y-1">
