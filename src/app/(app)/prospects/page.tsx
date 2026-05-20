@@ -37,9 +37,18 @@ export default async function ProspectsPage({
   const from = (page - 1) * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
 
-  const [{ data: campagnes }] = await Promise.all([
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+  const [{ data: campagnes }, { data: recentResponders }] = await Promise.all([
     supabase.from("campagnes").select("id, nom").order("created_at", { ascending: false }),
+    supabase
+      .from("conversations")
+      .select("prospect_id")
+      .eq("direction", "entrant")
+      .gte("timestamp", sevenDaysAgo),
   ]);
+
+  const recentResponderIds = new Set((recentResponders ?? []).map((r) => r.prospect_id));
 
   let baseQuery = supabase.from("prospects").select("*", { count: "exact" });
   if (statut && statut !== "tous") baseQuery = baseQuery.eq("statut", statut);
@@ -215,7 +224,20 @@ export default async function ProspectsPage({
                   className="transition-colors hover:bg-white/3"
                   style={{ borderBottom: i < prospects.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none" }}
                 >
-                  <td className="px-5 py-3.5 font-medium text-white">{p.nom || "—"}</td>
+                  <td className="px-5 py-3.5 font-medium text-white">
+                    <div className="flex items-center gap-2">
+                      <span>{p.nom || "—"}</span>
+                      {recentResponderIds.has(p.id) && (
+                        <span
+                          className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold text-white uppercase tracking-wider"
+                          style={{ background: "linear-gradient(135deg, #dc2626, #b91c1c)", boxShadow: "0 0 8px rgba(220,38,38,0.4)" }}
+                          title="A répondu dans les 7 derniers jours"
+                        >
+                          Nouveau
+                        </span>
+                      )}
+                    </div>
+                  </td>
                   <td className="px-5 py-3.5 text-white/50">{p.societe ?? "—"}</td>
                   <td className="px-5 py-3.5 text-white/50">{p.telephone}</td>
                   <td className="px-5 py-3.5 text-white/50">{p.ville ?? "—"}</td>
