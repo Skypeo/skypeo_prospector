@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import CampagnesClient, { CampagneActions, CampagneCardLink } from "./CampagnesClient";
+import AutoRefresh from "@/components/AutoRefresh";
 import type { CampagneStatut } from "@/types/database";
 
 const statutConfig: Record<CampagneStatut, { label: string; dot: string }> = {
@@ -29,10 +30,17 @@ export default async function CampagnesPage() {
 
   return (
     <div>
+      <AutoRefresh />
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-2xl font-bold text-white">Campagnes</h1>
-          <p className="text-white/40 text-sm mt-1">{campagnes?.length ?? 0} campagne(s)</p>
+          <p className="text-white/40 text-sm mt-1 flex items-center gap-2">
+            {campagnes?.length ?? 0} campagne(s)
+            <span className="inline-flex items-center gap-1 text-white/25">
+              <span className="w-1.5 h-1.5 rounded-full bg-brand-400 animate-pulse" />
+              màj auto
+            </span>
+          </p>
         </div>
         <CampagnesClient />
       </div>

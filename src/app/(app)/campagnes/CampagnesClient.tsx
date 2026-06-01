@@ -459,26 +459,37 @@ export function CampagneActions({
           <>
             {currentStatut === "active" && (
               <div className="flex items-center gap-1.5">
+                {/* Badge : la campagne tourne automatiquement (cron n8n) */}
+                <span
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold text-brand-300"
+                  style={{ background: "rgba(0,143,120,0.12)", border: "1px solid rgba(0,143,120,0.3)" }}
+                  title="L'envoi automatique tourne (cron n8n, chaque heure de 9h à 18h). Pas besoin d'appuyer sur quoi que ce soit."
+                >
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-brand-400" />
+                  </span>
+                  Envoi auto actif
+                </span>
+                {/* Forcer un envoi immédiat — action secondaire, optionnelle */}
                 <button
                   onClick={lancer}
                   disabled={sendStatus === "loading" || enAttenteCount === 0}
                   title={
                     enAttenteCount === 0
                       ? "Aucun prospect en attente dans cette campagne"
-                      : `Déclencher l'envoi pour ${enAttenteCount} prospect(s) en attente`
+                      : `Forcer un envoi immédiat (sans attendre le prochain créneau du cron) — ${enAttenteCount} prospect(s) en attente`
                   }
-                  className="px-3.5 py-1.5 text-xs font-semibold rounded-xl text-white disabled:opacity-40 transition-all"
-                  style={{ background: "linear-gradient(135deg, #008f78, #2b3475)" }}
+                  className="px-3 py-1.5 text-xs font-medium rounded-xl text-white/55 hover:text-white disabled:opacity-40 transition-all"
+                  style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)" }}
                 >
                   {sendStatus === "loading"
                     ? "Envoi..."
                     : sendStatus === "ok"
-                    ? "Déclenché ✓ (5s...)"
+                    ? "Déclenché ✓"
                     : sendStatus === "error"
                     ? "Erreur ✕"
-                    : enAttenteCount > 0
-                    ? `▶ Lancer (${enAttenteCount})`
-                    : "▶ Lancer l'envoi"}
+                    : "Forcer un envoi"}
                 </button>
                 {/* Info cron */}
                 <div className="relative">

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import AutoRefresh from "@/components/AutoRefresh";
 
 // Instant UTC correspondant à minuit (00:00) heure de Paris aujourd'hui.
 // Robuste quel que soit le fuseau du serveur (Vercel tourne en UTC).
@@ -101,6 +102,7 @@ export default async function DashboardPage() {
 
   return (
     <div>
+      <AutoRefresh />
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-2xl font-bold text-white">Dashboard</h1>
