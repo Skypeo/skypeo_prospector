@@ -1,7 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
-import CampagnesClient, { CampagneActions, CampagneCardLink } from "./CampagnesClient";
+import CampagnesClient, { CampagneActions, CampagneCardLink, EditNbEnvois } from "./CampagnesClient";
 import AutoRefresh from "@/components/AutoRefresh";
 import type { CampagneStatut } from "@/types/database";
+
+// Force un re-fetch à chaque rendu (router.refresh() inclus) : pas de cache
+// sur les compteurs de campagne.
+export const dynamic = "force-dynamic";
 
 const statutConfig: Record<CampagneStatut, { label: string; dot: string }> = {
   active:   { label: "Active",    dot: "bg-brand-400" },
@@ -77,7 +81,7 @@ export default async function CampagnesPage() {
                     </div>
                     <span className="text-xs text-white/30 shrink-0">{label}</span>
                     <span className="text-xs text-white/20 shrink-0">·</span>
-                    <span className="text-xs text-white/30 shrink-0">{c.nb_envois_par_jour} / jour</span>
+                    <EditNbEnvois campagneId={c.id} value={c.nb_envois_par_jour} />
                   </div>
                   <div className="pointer-events-auto relative z-10">
                     <CampagneActions campagneId={c.id} currentStatut={statut} enAttenteCount={stats.en_attente} />

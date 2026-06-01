@@ -2,6 +2,10 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import AutoRefresh from "@/components/AutoRefresh";
 
+// Force un re-fetch des données à chaque rendu (y compris router.refresh()),
+// sinon Next peut servir des compteurs en cache.
+export const dynamic = "force-dynamic";
+
 // Instant UTC correspondant à minuit (00:00) heure de Paris aujourd'hui.
 // Robuste quel que soit le fuseau du serveur (Vercel tourne en UTC).
 function startOfTodayParisISO(): string {

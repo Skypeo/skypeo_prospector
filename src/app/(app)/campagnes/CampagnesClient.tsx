@@ -377,6 +377,72 @@ function SelectProspectsModal({ campagneId, onClose }: { campagneId: string; onC
   );
 }
 
+export function EditNbEnvois({ campagneId, value }: { campagneId: string; value: number }) {
+  const router = useRouter();
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState(String(value));
+  const [saving, setSaving] = useState(false);
+
+  async function save() {
+    const n = parseInt(val, 10);
+    if (!n || n < 1 || n === value) {
+      setEditing(false);
+      setVal(String(value));
+      return;
+    }
+    setSaving(true);
+    const supabase = createClient();
+    await supabase.from("campagnes").update({ nb_envois_par_jour: n }).eq("id", campagneId);
+    setSaving(false);
+    setEditing(false);
+    router.refresh();
+  }
+
+  if (editing) {
+    return (
+      <span
+        className="inline-flex items-center gap-1 pointer-events-auto relative z-10 shrink-0"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <input
+          type="number"
+          min={1}
+          max={500}
+          autoFocus
+          value={val}
+          onChange={(e) => setVal(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") save();
+            if (e.key === "Escape") {
+              setEditing(false);
+              setVal(String(value));
+            }
+          }}
+          onBlur={save}
+          disabled={saving}
+          className="w-14 px-1.5 py-0.5 rounded-md text-xs text-white focus:outline-none focus:ring-1 focus:ring-brand-500/60"
+          style={{ background: "rgba(255,255,255,0.1)", border: "1px solid rgba(0,143,120,0.5)" }}
+        />
+        <span className="text-xs text-white/30">/ jour</span>
+      </span>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        setEditing(true);
+      }}
+      title="Modifier le nombre d'envois par jour"
+      className="text-xs text-white/30 hover:text-white/70 transition-colors pointer-events-auto relative z-10 shrink-0 underline decoration-dotted decoration-white/25 underline-offset-2"
+    >
+      {value} / jour
+    </button>
+  );
+}
+
 export function CampagneActions({
   campagneId,
   currentStatut,
@@ -486,7 +552,7 @@ export function CampagneActions({
                   {sendStatus === "loading"
                     ? "Envoi..."
                     : sendStatus === "ok"
-                    ? "Déclenché ✓"
+                    ? "Programmé ⏳ ~1 min"
                     : sendStatus === "error"
                     ? "Erreur ✕"
                     : "Forcer un envoi"}
