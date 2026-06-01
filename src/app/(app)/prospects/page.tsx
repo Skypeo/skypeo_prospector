@@ -5,7 +5,7 @@ import TemperatureBadge from "@/components/TemperatureBadge";
 import { SearchInput, DeleteProspectButton, CsvUploaderWrapper, PaginationControls, AddProspectButton } from "./ProspectsClient";
 import { Suspense } from "react";
 import type { ProspectStatut, ProspectTemperature } from "@/types/database";
-import { getProspectsAvecNouvelleReponse } from "@/lib/nouvellesReponses";
+import { getProspectsAvecNouvelleReponse, getDernieresReponses } from "@/lib/nouvellesReponses";
 
 const STATUTS: { value: ProspectStatut | "tous"; label: string }[] = [
   { value: "tous", label: "Tous" },
@@ -58,6 +58,11 @@ export default async function ProspectsPage({
   const { data: prospects, count } = await baseQuery
     .order("created_at", { ascending: false })
     .range(from, to);
+
+  const dernieresReponses = await getDernieresReponses(
+    supabase,
+    (prospects ?? []).map((p) => p.id)
+  );
 
   const totalCount = count ?? 0;
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
@@ -206,6 +211,7 @@ export default async function ProspectsPage({
                 <th className="px-5 py-3.5 text-left text-xs font-semibold text-white/35 uppercase tracking-wider">Ville</th>
                 <th className="px-5 py-3.5 text-left text-xs font-semibold text-white/35 uppercase tracking-wider">Statut</th>
                 <th className="px-5 py-3.5 text-left text-xs font-semibold text-white/35 uppercase tracking-wider">Température</th>
+                <th className="px-5 py-3.5 text-left text-xs font-semibold text-white/35 uppercase tracking-wider">Dernière réponse</th>
                 <th className="px-5 py-3.5 text-left text-xs font-semibold text-white/35 uppercase tracking-wider">Créé le</th>
                 <th className="px-5 py-3.5" />
               </tr>
@@ -239,6 +245,20 @@ export default async function ProspectsPage({
                   </td>
                   <td className="px-5 py-3.5">
                     <TemperatureBadge temperature={(p.temperature ?? "froid") as ProspectTemperature} />
+                  </td>
+                  <td className="px-5 py-3.5 text-xs">
+                    {dernieresReponses.has(p.id) ? (
+                      <span className="text-white/60">
+                        {new Date(dernieresReponses.get(p.id)!).toLocaleString("fr-FR", {
+                          day: "2-digit",
+                          month: "2-digit",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </span>
+                    ) : (
+                      <span className="text-white/20">—</span>
+                    )}
                   </td>
                   <td className="px-5 py-3.5 text-white/30 text-xs">
                     {new Date(p.created_at).toLocaleDateString("fr-FR")}

@@ -44,3 +44,28 @@ export async function getProspectsAvecNouvelleReponse(
   }
   return result;
 }
+
+/**
+ * Pour une liste de prospects, retourne la date (timestamp ISO) de leur
+ * dernière réponse entrante. Utilisé pour afficher la date/heure de réponse
+ * dans la liste des prospects (vue « Répondu » notamment).
+ */
+export async function getDernieresReponses(
+  supabase: SupabaseClient,
+  prospectIds: string[]
+): Promise<Map<string, string>> {
+  if (prospectIds.length === 0) return new Map();
+
+  const { data } = await supabase
+    .from("conversations")
+    .select("prospect_id, timestamp")
+    .eq("direction", "entrant")
+    .in("prospect_id", prospectIds)
+    .order("timestamp", { ascending: false });
+
+  const map = new Map<string, string>();
+  for (const c of data ?? []) {
+    if (!map.has(c.prospect_id)) map.set(c.prospect_id, c.timestamp);
+  }
+  return map;
+}

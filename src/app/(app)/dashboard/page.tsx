@@ -1,11 +1,24 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 
+// Instant UTC correspondant à minuit (00:00) heure de Paris aujourd'hui.
+// Robuste quel que soit le fuseau du serveur (Vercel tourne en UTC).
+function startOfTodayParisISO(): string {
+  const now = new Date();
+  const parisNow = new Date(now.toLocaleString("en-US", { timeZone: "Europe/Paris" }));
+  const offsetMs = now.getTime() - parisNow.getTime();
+  const parisMidnight = new Date(parisNow);
+  parisMidnight.setHours(0, 0, 0, 0);
+  return new Date(parisMidnight.getTime() + offsetMs).toISOString();
+}
+
 async function getStats() {
   const supabase = await createClient();
+  const debutJour = startOfTodayParisISO();
   const [
     { count: total },
     { count: envoyes },
+    { count: envoyesAujourdhui },
     { count: reponses },
     { count: rdv },
     { count: froids },
@@ -15,6 +28,7 @@ async function getStats() {
   ] = await Promise.all([
     supabase.from("prospects").select("*", { count: "exact", head: true }),
     supabase.from("conversations").select("*", { count: "exact", head: true }).eq("direction", "sortant"),
+    supabase.from("conversations").select("*", { count: "exact", head: true }).eq("direction", "sortant").gte("timestamp", debutJour),
     supabase.from("prospects").select("*", { count: "exact", head: true }).eq("statut", "repondu"),
     supabase.from("prospects").select("*", { count: "exact", head: true }).eq("statut", "rdv"),
     supabase.from("prospects").select("*", { count: "exact", head: true }).eq("temperature", "froid"),
@@ -25,6 +39,7 @@ async function getStats() {
   return {
     total: total ?? 0,
     envoyes: envoyes ?? 0,
+    envoyesAujourdhui: envoyesAujourdhui ?? 0,
     reponses: reponses ?? 0,
     rdv: rdv ?? 0,
     froids: froids ?? 0,
@@ -113,6 +128,33 @@ export default async function DashboardPage() {
             Campagnes
           </Link>
         </div>
+      </div>
+
+      {/* Indicateur de santé : envois du jour (pour vérifier que le cron tourne) */}
+      <div
+        className="rounded-2xl p-5 mb-6 flex items-center justify-between glass"
+        style={{ border: `1px solid ${stats.envoyesAujourdhui > 0 ? "rgba(74,222,128,0.25)" : "rgba(251,191,36,0.25)"}` }}
+      >
+        <div className="flex items-center gap-4">
+          <span
+            className="relative flex h-3 w-3"
+            title={stats.envoyesAujourdhui > 0 ? "Des messages sont partis aujourd'hui" : "Aucun message envoyé aujourd'hui"}
+          >
+            {stats.envoyesAujourdhui > 0 && (
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: "#4ade80" }} />
+            )}
+            <span className="relative inline-flex rounded-full h-3 w-3" style={{ background: stats.envoyesAujourdhui > 0 ? "#4ade80" : "#fbbf24" }} />
+          </span>
+          <div>
+            <p className="text-sm text-white/45">Messages envoyés aujourd&apos;hui</p>
+            <p className="text-3xl font-bold text-white mt-0.5">{stats.envoyesAujourdhui}</p>
+          </div>
+        </div>
+        <p className="text-xs text-white/30 text-right max-w-[200px]">
+          {stats.envoyesAujourdhui > 0
+            ? "L'envoi tourne ✓"
+            : "Rien envoyé aujourd'hui. Vérifiez qu'une campagne est active et que le cron n8n tourne."}
+        </p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
